@@ -20,14 +20,22 @@ namespace IPPhoneConsole
         private DataTable dtPriceList = new DataTable("PriceList");
 
         private List<NumberInternational> NumberInternationalTable = new List<NumberInternational>();
+        private List<ContactPhone> ContactTable = new List<ContactPhone>();
+        private List<PriceList> PriceListTable = new List<PriceList>();
+
         private int totalNumberInternaltional = 0;
+        private int totalContactTable = 0;
+        private int totalPriceListTable = 0;
 
         static void Main(string[] args)
         {
             Program program = new Program();
-            program.pushCallRecord();
 
-            Console.ReadLine();
+            //program.pushAllContact();
+            program.pushAllCallRecord();
+
+
+            //Console.ReadLine();
         }
 
         //-----------------------Establish onnection to DB--------------------------
@@ -78,7 +86,7 @@ namespace IPPhoneConsole
             int rowContact = dtContactPhone.Rows.Count;
             DataRow[] dtrowContact = dtContactPhone.Select();
 
-            List<ContactPhone> ContactTable = new List<ContactPhone>();
+
 
             for (int i = 0; i < rowContact; i++)
             {
@@ -116,10 +124,6 @@ namespace IPPhoneConsole
             int rowPriceList = dtPriceList.Rows.Count;
             DataRow[] dtrowPriceList = dtPriceList.Select();
 
-            List<PriceList> PriceListTable = new List<PriceList>();
-
-
-
             for (int i = 0; i < rowPriceList; i++)
             {
                 PriceList priceListTable = new PriceList();
@@ -130,19 +134,24 @@ namespace IPPhoneConsole
                 priceListTable.Type = dtrowPriceList[i]["Type"].ToString();
                 PriceListTable.Add(priceListTable);
 
+                //-------------Get list Number Internaltional Price  ---------------------------
                 if (dtrowPriceList[i]["Type"].ToString() == "2")
                 {
                     NumberInternational numberInternaltional = new NumberInternational();
                     numberInternaltional.Number = dtrowPriceList[i]["NumberHeader"].ToString();
                     numberInternaltional.Minute = dtrowPriceList[i]["Minute"].ToString();
+                    numberInternaltional.Block6 = dtrowPriceList[i]["Block6"].ToString();
+                    numberInternaltional.Second = dtrowPriceList[i]["Second"].ToString();
+
+                    string[] split = numberInternaltional.Number.Split(new Char[] { ';' });
+                    numberInternaltional.Prefix = split;
 
                     NumberInternationalTable.Add(numberInternaltional);
-                }
+                }//-------------Finish to get NumberInternaltional Tablle
             }
             totalNumberInternaltional = NumberInternationalTable.Count;
 
             //------------Sort NumberHeader in NumberInternational by Length of Header---------------
-            
             //-----------Finish sorting------------
 
             return PriceListTable;
@@ -151,18 +160,18 @@ namespace IPPhoneConsole
 
 
         //----------------------------Computing Charging for each Call records----------------------
-        public double computeCharging(  int type_call, int timeDuration, 
+        public double computeCharging(int type_call, string finalCalledPartyNumber, int timeDuration,
                                         double priceMinute, double priceBlock6, double priceSecond)
         {
             double totalCharging = 0;
 
+            int _second = 0;
+            if (timeDuration > 6)
+                _second = timeDuration - 6;
+
             switch (type_call)
             {
                 case 0://For "longDistance" and "Mobile" call records
-                    int _second = 0;
-                    if (timeDuration > 6)
-                        _second = timeDuration - 6;
-
                     totalCharging = priceBlock6 + _second * priceSecond;
                     break;
                 case 1://For "Local" and "Service" call records
@@ -175,28 +184,46 @@ namespace IPPhoneConsole
                     break;
 
                 case 2://For "International" call records
-                    /*/----------Notice............
-                    bool found = false;
-                    for (int i = 0; i < dtPartition.Rows.Count; i++)
                     {
-                        if (PriceListTable[PriceListIndex].NumberHeader.IndexOf(finalCalledPartyNumber) != -1)
+                        bool matchPrefix = false;
+
+                        for (int i = 4; i > 0; i--)
                         {
-                            totalCharging = _minute * Convert.ToDouble(dtrow3[i]["Minute"].ToString());
-                            found = true;
-                            break;
+                            string subFinalCalledPartyNumber = finalCalledPartyNumber.Substring(0, i);
+                            for (int j = 0; j < totalNumberInternaltional; j++)
+                            {
+                                if (Array.IndexOf(NumberInternationalTable[j].Prefix, subFinalCalledPartyNumber) >= 0)
+                                {
+                                    matchPrefix = true;
+
+                                    double priceMinuteInternaltional = Convert.ToDouble(NumberInternationalTable[j].Minute);
+                                    double priceBlock6Internaltional = Convert.ToDouble(NumberInternationalTable[j].Block6);
+                                    double priceSecondInternaltional = Convert.ToDouble(NumberInternationalTable[j].Second);
+
+                                    totalCharging = priceBlock6Internaltional + _second * priceSecondInternaltional;
+
+                                    break;
+                                }
+                            }
+
+                        }
+                        if (!matchPrefix)
+                        {
+                            for (int j = 0; j < totalNumberInternaltional; j++)
+                            {
+                                if (NumberInternationalTable[j].Number == "")
+                                {
+                                    double priceBlock6Internaltional = Convert.ToDouble(NumberInternationalTable[j].Block6);
+                                    double priceSecondInternaltional = Convert.ToDouble(NumberInternationalTable[j].Second);
+
+                                    totalCharging = priceBlock6Internaltional + _second * priceSecondInternaltional;
+
+                                }
+                            }
                         }
 
                     }
-                    List<NumberInternational> test;
-                    if (!found)
-                        for (int i = 0; i < dtPartition.Rows.Count; i++)
-                            if (dtrow3[i]["NumberHeader"].ToString() == "0")
-                                totalCharging = _minute * Convert.ToDouble(dtrow3[i]["Minute"].ToString());
-                    continue;
-                   */
-                    {
 
-                    }
                     break;
 
                 default:
@@ -208,11 +235,14 @@ namespace IPPhoneConsole
         //---------------------------------------Finish to compute charging----------------------
 
         //-----------------------------Push each Call Record to DB------------------------------
-        private void pushCallRecordToDatabase( int callingPartyNumber, string finalCalledPartyNumber, DateTime dateTimeConnect,
-                                    DateTime dateTimeDisconnect, string finalCalledPartyNumberPartition, string duration, 
+        private void pushEachCallRecord(int callingPartyNumber, string finalCalledPartyNumber, DateTime dateTimeConnect,
+                                    DateTime dateTimeDisconnect, string finalCalledPartyNumberPartition, string duration,
                                     double totalCharging, string authCodeDescription)
         {
-            string sql = "INSERT INTO CallRecord(CallingPartyNumber, AuthCodeDescription,FinalCalledPartyNumber, DateTimeConnect, DateTimeDisconnect, FinalCalledPartyNumberPartition, Duration, TotalCharging) values (@CallingPartyNumber_, @AuthCodeDescription_,@FinalCalledPartyNumber_, @DateTimeConnect_,@DateTimeDisconnect_, @FinalCalledPartyNumberPartition_, @Duration_, @TotalCharging_)";
+            string sql = "INSERT INTO CallRecord(CallingPartyNumber, AuthCodeDescription,FinalCalledPartyNumber, " +
+                            " DateTimeConnect, DateTimeDisconnect, FinalCalledPartyNumberPartition, Duration, TotalCharging) " +
+                            " values (@CallingPartyNumber_, @AuthCodeDescription_, @FinalCalledPartyNumber_, @DateTimeConnect_, " +
+                            " @DateTimeDisconnect_, @FinalCalledPartyNumberPartition_, @Duration_, @TotalCharging_)";
             //con.Open();
             SqlCommand cmd = new SqlCommand();
             cmd.Connection = con;
@@ -226,6 +256,7 @@ namespace IPPhoneConsole
             cmd.Parameters.AddWithValue("@Duration_", duration);
             cmd.Parameters.AddWithValue("@TotalCharging_", totalCharging);
             cmd.Parameters.AddWithValue("@AuthCodeDescription_", authCodeDescription);
+
             try
             {
                 //con.Open();
@@ -238,8 +269,26 @@ namespace IPPhoneConsole
         }
         //-----------------------------Finish to push each Call Record to DB---------------------
 
+        //---------------Function to check FinalCalledPartyNumberPartition match with PriceList Table--------------
+        private int checkPriceListMatch(string finalCalledPartyNumberPartition)
+        {
+            for (int priceListIndex = 0; priceListIndex < totalPriceListTable; priceListIndex++)
+                if (PriceListTable[priceListIndex].Category == finalCalledPartyNumberPartition)
+                    return priceListIndex;
+            return -1;
+        }//-------------------End of checked function----------------------
+
+        //---------------Function to check match Contact with Contact Table--------------
+        private int checkContactMatch(string callingPartyNumber)
+        {
+            for (int contactIndex = 0; contactIndex < totalContactTable; contactIndex++)
+                if (ContactTable[contactIndex].DirectoryNumber == Convert.ToInt32(callingPartyNumber))
+                    return contactIndex;
+            return -1;
+        }//-------------------End of checked function----------------------
+        
         //-----------------------------Push all Call Records to DB-----------------------
-        private void pushCallRecord()
+        private void pushAllCallRecord()
         {
             connect();
 
@@ -277,16 +326,15 @@ namespace IPPhoneConsole
 
                 //-------------Create table ContactPhone from Database--------------
 
-                List<ContactPhone> ContactTable = createContactTable();
-                int totalContactTable = ContactTable.Count;
-
+                ContactTable = createContactTable();
+                totalContactTable = ContactTable.Count;
 
                 //-------------Finish get ContactPhone------------
 
                 //-------------Create table 'PriceList' and table 'Number International' from Database--------------
-                List<PriceList> PriceListTable = createPriceListTable();
+                PriceListTable = createPriceListTable();
 
-                int totalPriceListTable = PriceListTable.Count;
+                totalPriceListTable = PriceListTable.Count;
 
                 //-------------Finish get PriceList- and table Number International-----------
 
@@ -298,7 +346,7 @@ namespace IPPhoneConsole
 
                     string[] fields = record.Split(new Char[] { ',' });
 
-                    int callingPartyNumber = Convert.ToInt32(fields[callingPartyNumberIndex]);
+                    string callingPartyNumber = fields[callingPartyNumberIndex];
                     string finalCalledPartyNumber = fields[finalCalledPartyNumberIndex];
                     DateTime dateTimeConnect = FromUnixTime(Convert.ToDouble(fields[dateTimeConnectIndex]));
                     DateTime dateTimeDisconnect = FromUnixTime(Convert.ToDouble(fields[dateTimeDisconnectIndex]));
@@ -312,88 +360,54 @@ namespace IPPhoneConsole
                     //--------------Check to get only Calling with Duration > 0 -----------------
                     if (Convert.ToInt32(duration) > 0)
                     {
-                        //---------------------Info Number-------------------
-                        bool ContactFound = false;
-                        int ContactMatch = 0;
-                        for (int contactIndex = 0; contactIndex < totalContactTable; contactIndex++)
+                        int indexPriceListMatch = checkPriceListMatch(finalCalledPartyNumberPartition);
+                        //---------------Check to match with PriceList Table------------------
+                        if (indexPriceListMatch >= 0)
                         {
-                            if (ContactTable[contactIndex].DirectoryNumber == callingPartyNumber)
-                            {
-                                ContactMatch = contactIndex;
-                                ContactFound = true;
-                                break;
-                            }
-                        }
+                            int timeDuration = Convert.ToInt32(duration);
+                            int type_call = Convert.ToInt32(PriceListTable[indexPriceListMatch].Type);
+                            double priceMinute = Convert.ToDouble(PriceListTable[indexPriceListMatch].Minute);
+                            double priceBlock6 = Convert.ToDouble(PriceListTable[indexPriceListMatch].Block6);
+                            double priceSecond = Convert.ToDouble(PriceListTable[indexPriceListMatch].Second);
 
-                        //-------------Checking to match Contact---------
-                        if (ContactFound)
-                        {
-                            //callingPartyNumber = Convert.ToString(ContactTable[ContactIndex].DirectoryNumber);
-                            //-------------------Finish get calling ID--------------------
-                            
-                            //-------------------Checking to get Full Information of Calling: authCodeDescription
-                            if (authCodeDescription == "")
-                            {
-                                authCodeDescription = ContactTable[ContactMatch].Department;
-                            } //-------------------Finish to get full Information
-
-                            
-                            bool PriceListFound = false;
-                            int PriceListMatch = 0;
-                            for (int priceListIndex = 0; priceListIndex < totalPriceListTable; priceListIndex++)
-                            {
-                                if (PriceListTable[priceListIndex].Category == finalCalledPartyNumberPartition)
-                                {
-                                    PriceListMatch = priceListIndex;
-                                    PriceListFound = true;
-                                    break;
-                                }
-                            }
-
-                            if (PriceListFound)
-                            {
-                                int type_call = Convert.ToInt32(PriceListTable[PriceListMatch].Type);
-                                int timeDuration = Convert.ToInt32(duration);
-                                double priceMinute = Convert.ToDouble(PriceListTable[PriceListMatch].Minute);
-                                double priceBlock6 = Convert.ToDouble(PriceListTable[PriceListMatch].Block6);
-                                double priceSecond = Convert.ToDouble(PriceListTable[PriceListMatch].Second);
-                                
-                                totalCharging = computeCharging(type_call, timeDuration, priceMinute, priceBlock6, priceSecond);
-
-
-                            }
-                            else //--------If not found in PriceList Info, it will return 0;
-                            {
-                                totalCharging = 0;
-                            }
+                            totalCharging = computeCharging(type_call, finalCalledPartyNumber, timeDuration, priceMinute, priceBlock6, priceSecond);
                             //--------- Finish compute charging---------------
 
-                            pushCallRecordToDatabase(callingPartyNumber, finalCalledPartyNumber, dateTimeConnect,
-                                    dateTimeDisconnect, finalCalledPartyNumberPartition, duration,
-                                    totalCharging, authCodeDescription);
+                            //-------------Checking to match Contact---------
+                            int indexContactMatch = checkContactMatch(callingPartyNumber);
+                            if (indexContactMatch >= 0)
+                            {
+                                //-------------------Checking to get Full Information of Calling: authCodeDescription
+                                if (authCodeDescription == "")
+                                {
+                                    authCodeDescription = ContactTable[indexContactMatch].Owner;
+                                } //-------------------Finish to get full Information
+                            }
+                            else
+                            {
+                                pushEachContact(Convert.ToInt32(callingPartyNumber), "", "", "");
+                                authCodeDescription = "";
+                            }//----------------------Finish to checking Info Number--------------- 
 
-                            
                             //-----------Push each call to server--------------
-                           // count++;
-                            
+                            pushEachCallRecord(Convert.ToInt32(callingPartyNumber), finalCalledPartyNumber, dateTimeConnect,
+                                dateTimeDisconnect, finalCalledPartyNumberPartition, duration,
+                                totalCharging, authCodeDescription);
                         }
-                        else
-                        {
-                            continue;
-                        }//----------------------Finish to checking Info Number--------------- 
 
+                        // count++;
                     }//--------------Finish to check Calling with Duration > 0 -----------------
 
                 }
                 disconnect();
-               
+
                 myFile.Close();
                 //System.Console.ReadLine();
                 //System.Console.WriteLine("Finish!", "Finish total " + count + "records!");
             }
             catch (Exception ex)
             {
-                Console.WriteLine("The file could not be read:");
+                Console.WriteLine("The file could not be read");
                 Console.WriteLine(ex.Message);
             }
         }
@@ -401,17 +415,16 @@ namespace IPPhoneConsole
 
 
         ////-----------------------------Push all Contacts to DB-------------------
-        private void pushContact()
+        private void pushAllContact()
         {
             connect();
 
-            string full_path = System.IO.Path.GetFullPath("C:\\Users\\Huy Hoang\\Desktop\\IP Phone\\");
+            string full_path = System.IO.Path.GetFullPath("C:\\Users\\Huy Hoang\\Desktop\\IP Phone\\info.csv");
             try
             {
                 System.IO.StreamReader myFile = new System.IO.StreamReader(full_path);
 
                 string myString = myFile.ReadLine();
-
 
                 string[] split = myString.Split(new Char[] { ',' });
 
@@ -422,7 +435,7 @@ namespace IPPhoneConsole
                 int departmentIndex = Array.IndexOf(split, "department");
 
                 int companyIndex = Array.IndexOf(split, "company");
-      
+
                 int count = 0;
                 while (!myFile.EndOfStream)
                 {
@@ -431,35 +444,13 @@ namespace IPPhoneConsole
 
                     string[] fields = record.Split(new Char[] { ',' });
 
-                    string DirectoryNumber = fields[directoryNumberIndex];
+                    int DirectoryNumber = Convert.ToInt32(fields[directoryNumberIndex]);
                     string Owner = fields[ownerIndex];
                     string Company = fields[companyIndex];
                     string Department = fields[departmentIndex];
 
-
-
                     //-----------Push each call to server--------------
-                    string sql = "INSERT INTO InfoNumberPhone(DirectoryNumber, Owner, Department, Company) values (@DirectoryNumber_, @Owner_, @Department_, @Company_)";
-                    //con.Open();@PhoneNumber_, @Department_Name_, @Department_Des
-                    SqlCommand cmd = new SqlCommand();
-                    cmd.Connection = con;
-                    cmd.CommandType = CommandType.Text;
-                    cmd.CommandText = sql;
-                    cmd.Parameters.AddWithValue("@DirectoryNumber_", DirectoryNumber);
-                    cmd.Parameters.AddWithValue("@Owner_", Owner);
-                    cmd.Parameters.AddWithValue("@Department_N", Department);
-                    cmd.Parameters.AddWithValue("@Company_", Company);
-
-                    try
-                    {
-                        //con.Open();
-                        int recordsAffected = cmd.ExecuteNonQuery();
-                    }
-                    catch (System.Data.SqlClient.SqlException sqlException)
-                    {
-                        System.Console.WriteLine(sqlException.Message);
-                    }
-
+                    pushEachContact(DirectoryNumber, Owner, Department, Company);
                 }
                 disconnect();
 
@@ -471,6 +462,44 @@ namespace IPPhoneConsole
             }
         }
         //-----------------------------Finish to Push all Contacts to DB------
+
+        ////-----------------------------Push each Contact to DB-------------------
+        private void pushEachContact(int callingPartyNumber, string Owner, string Department, string Company)
+        {
+            //connect();
+
+            //-------------Check Contact Existance in this DB-------------------------
+            DataTable dtSample = new DataTable("Contact");
+            SqlDataAdapter dtAp = new SqlDataAdapter(@"Select * from Contact where (DirectoryNumber = '" + callingPartyNumber + "')", con);
+            dtAp.Fill(dtSample);
+
+            if (dtSample.Rows.Count <= 0)
+            {
+                //-----------Push each call to server--------------
+                string sql = "INSERT INTO Contact(DirectoryNumber, Owner, Department, Company) values (@DirectoryNumber_, @Owner_, @Department_, @Company_)";
+                //con.Open();@PhoneNumber_, @Department_Name_, @Department_Des
+                SqlCommand cmd = new SqlCommand();
+                cmd.Connection = con;
+                cmd.CommandType = CommandType.Text;
+                cmd.CommandText = sql;
+                cmd.Parameters.AddWithValue("@DirectoryNumber_", callingPartyNumber);
+                cmd.Parameters.AddWithValue("@Owner_", Owner);
+                cmd.Parameters.AddWithValue("@Department_", Department);
+                cmd.Parameters.AddWithValue("@Company_", Company);
+
+                try
+                {
+                    //con.Open();
+                    int recordsAffected = cmd.ExecuteNonQuery();
+                }
+                catch (System.Data.SqlClient.SqlException sqlException)
+                {
+                    System.Console.WriteLine(sqlException.Message);
+                }
+            }
+            //disconnect();
+        }
+        //-----------------------------Finish to Push each Contact to DB------
 
         //--------------------------Function to convert time from UNIX to REAL Time-----------------
         public DateTime FromUnixTime(Double unixTime)
@@ -499,9 +528,24 @@ namespace IPPhoneConsole
             set { minute = value; }
         }
 
-        private List<string> prefix;
+        private string block6;
 
-        public List<string> Prefix
+        public string Block6
+        {
+            get { return block6; }
+            set { block6 = value; }
+        }
+        private string second;
+
+        public string Second
+        {
+            get { return second; }
+            set { second = value; }
+        }
+
+        private string[] prefix;
+
+        public string[] Prefix
         {
             get { return prefix; }
             set { prefix = value; }
@@ -608,5 +652,5 @@ namespace IPPhoneConsole
         }
     }
     //-----------------------End of class PriceList------------------------
-    
+
 }
