@@ -7,13 +7,15 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Windows;
 
+using MySql.Data.MySqlClient;
 
 namespace IPPhoneConsole
 {
     public class Program
     {
-        private SqlConnection con;
-        private SqlDataAdapter da = new SqlDataAdapter();
+        //private MySqlConnection con;
+        private MySqlConnection connection;
+        private MySqlDataAdapter da = new MySqlDataAdapter();
 
         private DataTable dtPartition = new DataTable("Partition");
         private DataTable dtContactPhone = new DataTable("ContactPhone");
@@ -33,20 +35,29 @@ namespace IPPhoneConsole
 
             //program.pushAllContact();
             program.pushAllCallRecord();
-
-
+            //program.connect();
             //Console.ReadLine();
         }
 
         //-----------------------Establish onnection to DB--------------------------
         private void connect()
         {
+            //Connect to MS SQL
             String cn = "Data Source=ADVENTURE\\HUYHOANG; Initial Catalog = IPPhone; Persist Security Info = True; User ID = sa; Password = 123456";
+            
+            //Connect to MySQL
+            String cnMySQL = "SERVER=10.1.11.144; PORT = 3306 ; DATABASE=IPPhone ; UID=root; PASSWORD=123@123a";
+            
+            
             //String cn = "Data Source = (local); Initial Catalog = iPMAC; Integrated Security = True";
             try
             {
-                con = new SqlConnection(cn);
-                con.Open(); //Mo cket noi
+                //con = new SqlConnection(cn);
+                //con.Open(); //Mo cket noi
+
+                connection = new MySqlConnection(cnMySQL);
+                connection.Open();
+                //System.Console.WriteLine("Connection successfullly!");
                 //MessageBox.Show("Successful!", "Connected DB Successful!", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             }
@@ -61,22 +72,22 @@ namespace IPPhoneConsole
         //------------------------Destroy connection to DB-------------------------
         private void disconnect()
         {
-            con.Close();
-            con.Dispose();
-            con = null;
+            connection.Close();
+            connection.Dispose();
+            connection = null;
         }
         //------------------------Finish destroy connection to DB---------------
 
         //----------------------------Create Contact tablie from Database------------------
         public List<ContactPhone> createContactTable()
         {
-            SqlCommand cmdContact = new SqlCommand();
-            cmdContact.Connection = con;
+            MySqlCommand cmdContact = new MySqlCommand();
+            cmdContact.Connection = connection;
             cmdContact.CommandType = CommandType.Text;
-            cmdContact.CommandText = @"Select   Contact.DirectoryNumber as N'DirectoryNumber',
-                                                        Owner as N'Owner',
-                                                        Department as N'Department',
-                                                        Company as N'Company'
+            cmdContact.CommandText = @"Select DirectoryNumber,
+                                                        Owner,
+                                                        Department,
+                                                        Company
                                                     from Contact";
 
             da.SelectCommand = cmdContact;
@@ -85,8 +96,6 @@ namespace IPPhoneConsole
 
             int rowContact = dtContactPhone.Rows.Count;
             DataRow[] dtrowContact = dtContactPhone.Select();
-
-
 
             for (int i = 0; i < rowContact; i++)
             {
@@ -105,16 +114,16 @@ namespace IPPhoneConsole
         //----------------------------Create Price List tablie from Database------------------
         public List<PriceList> createPriceListTable()
         {
-            SqlCommand cmdPriceList = new SqlCommand();
-            cmdPriceList.Connection = con;
+            MySqlCommand cmdPriceList = new MySqlCommand();
+            cmdPriceList.Connection = connection;
             cmdPriceList.CommandType = CommandType.Text;
-            cmdPriceList.CommandText = @"Select   PriceList.ID as N'ID',
-                                                        Category as N'Category',
-                                                        NumberHeader as N'NumberHeader',
-                                                        Minute as N'Minute',
-                                                        Block6 as N'Block6',
-                                                        Second as N'Second',
-                                                        Type as N'Type'
+            cmdPriceList.CommandText = @"Select
+                                                        Category,
+                                                        NumberHeader,
+                                                        Minute,
+                                                        Block6,
+                                                        Second,
+                                                        Type
                                                     from PriceList";
 
             da.SelectCommand = cmdPriceList;
@@ -244,8 +253,8 @@ namespace IPPhoneConsole
                             " values (@CallingPartyNumber_, @AuthCodeDescription_, @FinalCalledPartyNumber_, @DateTimeConnect_, " +
                             " @DateTimeDisconnect_, @FinalCalledPartyNumberPartition_, @Duration_, @TotalCharging_)";
             //con.Open();
-            SqlCommand cmd = new SqlCommand();
-            cmd.Connection = con;
+            MySqlCommand cmd = new MySqlCommand();
+            cmd.Connection = connection;
             cmd.CommandType = CommandType.Text;
             cmd.CommandText = sql;
             cmd.Parameters.AddWithValue("@CallingPartyNumber_", callingPartyNumber);
@@ -407,7 +416,7 @@ namespace IPPhoneConsole
             }
             catch (Exception ex)
             {
-                Console.WriteLine("The file could not be read");
+                //Console.WriteLine("The file could not be read");
                 Console.WriteLine(ex.Message);
             }
         }
@@ -470,7 +479,7 @@ namespace IPPhoneConsole
 
             //-------------Check Contact Existance in this DB-------------------------
             DataTable dtSample = new DataTable("Contact");
-            SqlDataAdapter dtAp = new SqlDataAdapter(@"Select * from Contact where (DirectoryNumber = '" + callingPartyNumber + "')", con);
+            MySqlDataAdapter dtAp = new MySqlDataAdapter(@"Select * from Contact where (DirectoryNumber = '" + callingPartyNumber + "')", connection);
             dtAp.Fill(dtSample);
 
             if (dtSample.Rows.Count <= 0)
@@ -478,8 +487,8 @@ namespace IPPhoneConsole
                 //-----------Push each call to server--------------
                 string sql = "INSERT INTO Contact(DirectoryNumber, Owner, Department, Company) values (@DirectoryNumber_, @Owner_, @Department_, @Company_)";
                 //con.Open();@PhoneNumber_, @Department_Name_, @Department_Des
-                SqlCommand cmd = new SqlCommand();
-                cmd.Connection = con;
+                MySqlCommand cmd = new MySqlCommand();
+                cmd.Connection = connection;
                 cmd.CommandType = CommandType.Text;
                 cmd.CommandText = sql;
                 cmd.Parameters.AddWithValue("@DirectoryNumber_", callingPartyNumber);
