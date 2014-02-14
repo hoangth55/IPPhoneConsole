@@ -517,6 +517,62 @@ namespace IPPhoneConsole
             return epoch.AddSeconds(unixTime);
         }
         //-------------------------End of FromUnixTime Function -----------------
+
+        //----------------------Function report-----------------
+        public void report()
+        {
+            connect();
+
+            //-------------Create table ContactPhone from Database--------------
+            ContactTable = createContactTable();
+            totalContactTable = ContactTable.Count;
+            //-------------Finish get ContactPhone------------
+
+            //
+            DataTable dtCallRecord = new DataTable("CallRecord");
+            MySqlDataAdapter dtAp = new MySqlDataAdapter(@"Select * from CallRecord ", connection);
+            dtAp.Fill(dtCallRecord);
+            int totalCallRecord = dtCallRecord.Rows.Count;
+            DataRow[] dtrowCallRecord = dtCallRecord.Select();
+
+            for (int i  = 0; i < totalCallRecord; i++){             
+                string sql = "INSERT INTO CallRecord(CallingPartyNumber, AuthCodeDescription, Department, Company, FinalCalledPartyNumber, " +
+                            " DateTimeConnect, DateTimeDisconnect, FinalCalledPartyNumberPartition, Duration, TotalCharging) " +
+                            " values (@CallingPartyNumber_, @AuthCodeDescription_,  @Department_, @Company_, @FinalCalledPartyNumber_, @DateTimeConnect_, " +
+                            " @DateTimeDisconnect_, @FinalCalledPartyNumberPartition_, @Duration_, @TotalCharging_)";
+                MySqlCommand cmd = new MySqlCommand();
+                cmd.Connection = connection;
+                cmd.CommandType = CommandType.Text;
+                cmd.CommandText = sql;
+
+                for (int j = 0; j < totalContactTable; j++)
+                {
+                    if (Convert.ToInt32(dtrowCallRecord[i]["CallingPartyNumber"].ToString()) == ContactTable[j].DirectoryNumber)
+                    {
+                        cmd.Parameters.AddWithValue("@CallingPartyNumber_", dtrowCallRecord[i]["CallingPartyNumber"].ToString());
+                        cmd.Parameters.AddWithValue("@AuthCodeDescription_", ContactTable[j].Owner);
+                        cmd.Parameters.AddWithValue("@Department_", ContactTable[j].Department);
+                        cmd.Parameters.AddWithValue("@Company_", ContactTable[j].Company);
+                        cmd.Parameters.AddWithValue("@FinalCalledPartyNumber_", dtrowCallRecord[i]["FinalCalledPartyNumber"]);
+                        cmd.Parameters.AddWithValue("@DateTimeConnect_", dtrowCallRecord[i]["DateTimeConnect"]);
+                        cmd.Parameters.AddWithValue("@DateTimeDisconnect_", dtrowCallRecord[i]["DateTimeDisconnect"]);
+                        cmd.Parameters.AddWithValue("@FinalCalledPartyNumberPartition_", dtrowCallRecord[i]["FinalCalledPartyNumberPartition"]);
+                        cmd.Parameters.AddWithValue("@Duration_", dtrowCallRecord[i]["Duration"]);
+                        cmd.Parameters.AddWithValue("@TotalCharging_", dtrowCallRecord[i]["TotalCharging"]);
+                        break;
+                    }
+                }
+                try
+                {
+                    int recordsAffected = cmd.ExecuteNonQuery();
+                }
+                catch (System.Data.SqlClient.SqlException sqlException)
+                {
+                    System.Console.WriteLine(sqlException.Message);
+                }
+            }
+        }
+        //-----------------------End of Report---------------------
     }
 
     //-----------------------Create table NumberInternaltional from DB------------------
