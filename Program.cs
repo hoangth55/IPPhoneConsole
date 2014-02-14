@@ -301,7 +301,7 @@ namespace IPPhoneConsole
         {
             connect();
 
-            string full_path = System.IO.Path.GetFullPath("C:\\Users\\Huy Hoang\\Desktop\\IP Phone\\thang12.csv");
+            string full_path = System.IO.Path.GetFullPath("C:\\Users\\Huy Hoang\\Desktop\\IP Phone\\thang1.csv");
 
             try
             {
@@ -428,7 +428,7 @@ namespace IPPhoneConsole
         {
             connect();
 
-            string full_path = System.IO.Path.GetFullPath("C:\\Users\\Huy Hoang\\Desktop\\IP Phone\\info.csv");
+            string full_path = System.IO.Path.GetFullPath("C:\\Users\\Huy Hoang\\Desktop\\IP Phone\\Information.csv");
             try
             {
                 System.IO.StreamReader myFile = new System.IO.StreamReader(full_path);
@@ -437,13 +437,13 @@ namespace IPPhoneConsole
 
                 string[] split = myString.Split(new Char[] { ',' });
 
-                int directoryNumberIndex = Array.IndexOf(split, "officephone");
+                int directoryNumberIndex = Array.IndexOf(split, "Extension");
 
-                int ownerIndex = Array.IndexOf(split, "samaccountname");
+                int ownerIndex = Array.IndexOf(split, "Account");
 
-                int departmentIndex = Array.IndexOf(split, "department");
+                int departmentIndex = Array.IndexOf(split, "Department");
 
-                int companyIndex = Array.IndexOf(split, "company");
+                int companyIndex = Array.IndexOf(split, "Company");
 
                 int count = 0;
                 while (!myFile.EndOfStream)
